@@ -11,6 +11,7 @@ from flask import (
 )
 from markupsafe import escape
 
+from app.models import User, db
 from app.spotify_client import get_oauth
 
 main = Blueprint("main", __name__)
@@ -54,10 +55,30 @@ def callback():
     display_name = profile.get("display_name") or spotify_id
     current_app.logger.info("Spotify login: id=%s display_name=%s", spotify_id, display_name)
 
-    # TODO (Phase 2): look up or create the User row by spotify_id, save
-    # token_info["refresh_token"] on it, and set session["user_id"] to the
-    # internal user id. Until models exist, keep the Spotify identity in the
-    # session only so the home page can show who is logged in.
+    images = profile.get("images") or []
+    image_url = images[0]["url"] if images else None
+    refresh_token = token_info.get("refresh_token")
+
+    user = User.query.filter_by(spotify_id=spotify_id).first()
+    if user is None:
+        if not refresh_token:
+            return "Spotify did not return a refresh token.", 502
+        user = User(
+            spotify_id=spotify_id,
+            display_name=display_name,
+            profile_image_url=image_url,
+            spotify_refresh_token=refresh_token,
+        )
+        db.session.add(user)
+    else:
+        user.display_name = display_name
+        user.profile_image_url = image_url
+        # Spotify only sometimes returns a refresh token; keep the old one otherwise.
+        if refresh_token:
+            user.spotify_refresh_token = refresh_token
+    db.session.commit()
+
+    session["user_id"] = user.id
     session["spotify_id"] = spotify_id
     session["display_name"] = display_name
 

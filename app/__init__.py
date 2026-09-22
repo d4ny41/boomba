@@ -3,12 +3,15 @@ import logging
 from flask import Flask
 
 from app.config import Config
+from app.models import db
 
 
 def create_app():
     app = Flask(__name__, template_folder="../templates", static_folder="../static")
     app.config.from_object(Config)
     app.logger.setLevel(logging.INFO)
+
+    db.init_app(app)
 
     from app.routes import main
 
