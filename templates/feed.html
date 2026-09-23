@@ -3,6 +3,46 @@
 {% block title %}Feed · boomba{% endblock %}
 
 {% block content %}
-  <h1>Feed</h1>
-  <p class="muted">Coming soon.</p>
+  <h1>Your top tracks this month</h1>
+
+  {% if not tracks %}
+    <p class="muted">
+      Spotify hasn't worked out your top tracks yet. Listen for a bit and check back,
+      or <a href="{{ url_for('main.rate') }}">rate your recent plays</a> in the meantime.
+    </p>
+  {% else %}
+    <ul class="tracks">
+      {% for t in tracks %}
+        <li class="track" id="track-{{ t.id }}">
+          <span class="rank">{{ loop.index }}</span>
+
+          {% if t.album_art_url %}
+            <img class="art" src="{{ t.album_art_url }}" alt="{{ t.album_name or t.name }} cover" width="64" height="64">
+          {% else %}
+            <div class="art art-missing"></div>
+          {% endif %}
+
+          <div class="meta">
+            <div class="name">{{ t.name }}</div>
+            <div class="artist">{{ t.artist_name }}</div>
+            {% if t.id in scores %}
+              <div class="current-rating">Your rating: {{ scores[t.id] }}/5</div>
+            {% endif %}
+          </div>
+
+          <form class="rating" method="post" action="{{ url_for('main.rate_submit') }}">
+            <input type="hidden" name="track_id" value="{{ t.id }}">
+            <input type="hidden" name="next" value="feed">
+            {% for n in range(1, 6) %}
+              <label>
+                <input type="radio" name="score" value="{{ n }}" {% if scores.get(t.id) == n %}checked{% endif %} required>
+                {{ n }}
+              </label>
+            {% endfor %}
+            <button type="submit">Save</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
 {% endblock %}

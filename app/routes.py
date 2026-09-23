@@ -32,7 +32,7 @@ VALID_SCORES = {"1", "2", "3", "4", "5"}
 @main.route("/")
 def index():
     if session.get("user_id"):
-        return redirect(url_for("main.rate"))
+        return redirect(url_for("main.feed"))
     return render_template("index.html")
 
 
@@ -90,7 +90,7 @@ def callback():
     session["spotify_id"] = spotify_id
     session["display_name"] = display_name
 
-    return redirect(url_for("main.index"))
+    return redirect(url_for("main.feed"))
 
 
 @main.route("/logout")
@@ -102,7 +102,28 @@ def logout():
 @main.route("/feed")
 @login_required
 def feed():
-    return render_template("feed.html")
+    try:
+        sp = get_spotify_for_user(g.user)
+    except SpotifyAuthError as e:
+        current_app.logger.info("%s", e)
+        session.clear()
+        flash("Your Spotify session has expired. Please log in again.", "error")
+        return redirect(url_for("main.login"))
+
+    # Top-tracks items are track objects directly (no {"track": ...} wrapper),
+    # already in rank order.
+    items = sp.current_user_top_tracks(limit=20, time_range="short_term")["items"]
+    tracks = get_or_create_tracks(items)
+
+    scores = {}
+    if tracks:
+        ratings = Rating.query.filter(
+            Rating.user_id == g.user.id,
+            Rating.track_id.in_([t.id for t in tracks]),
+        ).all()
+        scores = {r.track_id: r.score for r in ratings}
+
+    return render_template("feed.html", tracks=tracks, scores=scores)
 
 
 @main.route("/rate", methods=["GET"])
