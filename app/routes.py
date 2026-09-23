@@ -4,28 +4,36 @@ import spotipy
 from flask import (
     Blueprint,
     current_app,
+    flash,
+    g,
     redirect,
+    render_template,
     request,
     session,
     url_for,
 )
 from markupsafe import escape
+from sqlalchemy import func
+from sqlalchemy.dialects.mysql import insert as mysql_insert
 
-from app.models import User, db
-from app.spotify_client import get_oauth
+from app.auth import login_required
+from app.models import Rating, Track, User, db
+from app.services import get_or_create_tracks
+from app.spotify_client import SpotifyAuthError, get_oauth, get_spotify_for_user
 
 main = Blueprint("main", __name__)
 
 
+# The only places a POST /rate may send the user back to; never a URL from the form.
+NEXT_ENDPOINTS = {"rate": "main.rate", "feed": "main.feed"}
+VALID_SCORES = {"1", "2", "3", "4", "5"}
+
+
 @main.route("/")
 def index():
-    name = session.get("display_name")
-    if name:
-        return (
-            f"<p>Logged in as {escape(name)} ({escape(session['spotify_id'])})</p>"
-            f'<p><a href="{url_for("main.logout")}">Log out</a></p>'
-        )
-    return f'<p><a href="{url_for("main.login")}">Log in with Spotify</a></p>'
+    if session.get("user_id"):
+        return redirect(url_for("main.rate"))
+    return render_template("index.html")
 
 
 @main.route("/login")
@@ -89,3 +97,75 @@ def callback():
 def logout():
     session.clear()
     return redirect(url_for("main.index"))
+
+
+@main.route("/feed")
+@login_required
+def feed():
+    return render_template("feed.html")
+
+
+@main.route("/rate", methods=["GET"])
+@login_required
+def rate():
+    try:
+        sp = get_spotify_for_user(g.user)
+    except SpotifyAuthError as e:
+        current_app.logger.info("%s", e)
+        session.clear()
+        flash("Your Spotify session has expired. Please log in again.", "error")
+        return redirect(url_for("main.login"))
+
+    items = sp.current_user_recently_played(limit=50)["items"]
+
+    # Items come newest first, so the first time we see a track id is its most recent play.
+    seen = set()
+    raw_tracks = []
+    for item in items:
+        track = item.get("track")
+        if not track or not track.get("id") or track["id"] in seen:
+            continue
+        seen.add(track["id"])
+        raw_tracks.append(track)
+
+    tracks = get_or_create_tracks(raw_tracks)
+
+    scores = {}
+    if tracks:
+        ratings = Rating.query.filter(
+            Rating.user_id == g.user.id,
+            Rating.track_id.in_([t.id for t in tracks]),
+        ).all()
+        scores = {r.track_id: r.score for r in ratings}
+
+    return render_template("rate.html", tracks=tracks, scores=scores)
+
+
+@main.route("/rate", methods=["POST"])
+@login_required
+def rate_submit():
+    endpoint = NEXT_ENDPOINTS.get(request.form.get("next"), "main.rate")
+    user_id = session["user_id"]
+
+    raw_score = request.form.get("score", "")
+    raw_track_id = request.form.get("track_id", "")
+    track = None
+    if raw_track_id.isascii() and raw_track_id.isdigit() and len(raw_track_id) <= 10:
+        track = db.session.get(Track, int(raw_track_id))
+
+    if raw_score not in VALID_SCORES or track is None:
+        flash("Invalid rating submission; nothing was saved.", "error")
+        return redirect(url_for(endpoint))
+    score = int(raw_score)
+
+    # Single-statement upsert on uq_ratings_user_track. rated_at is set explicitly
+    # because the model's onupdate doesn't fire for ON DUPLICATE KEY UPDATE.
+    stmt = mysql_insert(Rating).values(
+        user_id=user_id, track_id=track.id, score=score, rated_at=func.now()
+    )
+    stmt = stmt.on_duplicate_key_update(score=stmt.inserted.score, rated_at=func.now())
+    db.session.execute(stmt)
+    db.session.commit()
+
+    flash(f"Rated {track.name}: {score}/5", "success")
+    return redirect(url_for(endpoint, _anchor=f"track-{track.id}"))
