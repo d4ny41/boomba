@@ -27,8 +27,10 @@ class Config:
     SPOTIFY_CLIENT_SECRET = os.environ["SPOTIFY_CLIENT_SECRET"]
     SPOTIFY_REDIRECT_URI = os.environ["SPOTIFY_REDIRECT_URI"]
     SECRET_KEY = os.environ["FLASK_SECRET_KEY"]
-    # No CSRF tokens yet: Lax keeps the session cookie off cross-site POSTs.
+    # Defence in depth alongside CSRFProtect: Lax keeps the session cookie off
+    # cross-site POSTs, HttpOnly keeps it out of reach of page JS.
     SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_HTTPONLY = True
 
     SQLALCHEMY_DATABASE_URI = (
         f"mysql+pymysql://{quote_plus(os.environ['MYSQL_USER'])}"

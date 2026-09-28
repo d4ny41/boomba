@@ -31,6 +31,7 @@
           </div>
 
           <form class="rating" method="post" action="{{ url_for('main.rate_submit') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="track_id" value="{{ t.id }}">
             <input type="hidden" name="next" value="feed">
             {% for n in range(1, 6) %}
