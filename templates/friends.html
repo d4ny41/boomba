@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Friends · boomba{% endblock %}
+
+{% macro avatar(user) %}
+  {% if user.profile_image_url %}
+    <img class="avatar" src="{{ user.profile_image_url }}" alt="" width="40" height="40">
+  {% else %}
+    <div class="avatar art-missing"></div>
+  {% endif %}
+{% endmacro %}
+
+{% macro post_button(endpoint, label, secondary=false) %}
+  <form method="post" action="{{ url_for(endpoint, **kwargs) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit"{% if secondary %} class="secondary"{% endif %}>{{ label }}</button>
+  </form>
+{% endmacro %}
+
+{% block content %}
+  <h1>Friends</h1>
+
+  <h2>Incoming requests</h2>
+  {% if not incoming %}
+    <p class="muted">No pending requests.</p>
+  {% endif %}
+  <ul class="people">
+    {% for r in incoming %}
+      <li class="person">
+        {{ avatar(r.sender) }}
+        <span class="name">{{ r.sender.display_name }}</span>
+        <div class="actions">
+          {{ post_button('main.friend_accept', 'Accept', request_id=r.id) }}
+          {{ post_button('main.friend_decline', 'Decline', secondary=true, request_id=r.id) }}
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <h2>Sent requests</h2>
+  {% if not outgoing %}
+    <p class="muted">No requests waiting on a reply.</p>
+  {% endif %}
+  <ul class="people">
+    {% for r in outgoing %}
+      <li class="person">
+        {{ avatar(r.recipient) }}
+        <span class="name">{{ r.recipient.display_name }}</span>
+        <div class="actions">
+          {{ post_button('main.friend_cancel', 'Cancel', secondary=true, request_id=r.id) }}
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <h2>Your friends</h2>
+  {% if not friends %}
+    <p class="muted">No friends yet.</p>
+  {% endif %}
+  <ul class="people">
+    {% for u in friends %}
+      <li class="person">
+        {{ avatar(u) }}
+        <span class="name">{{ u.display_name }}</span>
+        <div class="actions">
+          <span class="muted" title="Coming soon">View ratings</span>
+          {{ post_button('main.friend_remove', 'Unfriend', secondary=true, user_id=u.id) }}
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <h2>Add friends</h2>
+  {% if not others %}
+    <p class="muted">No one else to add right now.</p>
+  {% endif %}
+  <ul class="people">
+    {% for u in others %}
+      <li class="person">
+        {{ avatar(u) }}
+        <span class="name">{{ u.display_name }}</span>
+        <div class="actions">
+          {{ post_button('main.friend_request', 'Add', user_id=u.id) }}
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% endblock %}

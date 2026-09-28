@@ -3,6 +3,7 @@ import secrets
 import spotipy
 from flask import (
     Blueprint,
+    abort,
     current_app,
     flash,
     g,
@@ -13,12 +14,18 @@ from flask import (
     url_for,
 )
 from markupsafe import escape
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 
 from app.auth import login_required
-from app.models import Rating, Track, User, db
-from app.services import get_or_create_tracks
+from app.models import Friendship, Rating, Track, User, db
+from app.services import (
+    count_incoming_requests,
+    get_friends,
+    get_friendship,
+    get_or_create_tracks,
+    get_relationship,
+)
 from app.spotify_client import SpotifyAuthError, get_oauth, get_spotify_for_user
 
 main = Blueprint("main", __name__)
@@ -27,6 +34,12 @@ main = Blueprint("main", __name__)
 # The only places a POST /rate may send the user back to; never a URL from the form.
 NEXT_ENDPOINTS = {"rate": "main.rate", "feed": "main.feed"}
 VALID_SCORES = {"1", "2", "3", "4", "5"}
+
+
+@main.app_context_processor
+def inject_incoming_request_count():
+    user_id = session.get("user_id")
+    return {"incoming_request_count": count_incoming_requests(user_id) if user_id else 0}
 
 
 @main.route("/")
@@ -190,3 +203,123 @@ def rate_submit():
 
     flash(f"Rated {track.name}: {score}/5", "success")
     return redirect(url_for(endpoint, _anchor=f"track-{track.id}"))
+
+
+@main.route("/friends")
+@login_required
+def friends():
+    me = g.user.id
+
+    incoming = (
+        Friendship.query.filter_by(friend_id=me, status="pending")
+        .order_by(Friendship.created_at.desc())
+        .all()
+    )
+    outgoing = (
+        Friendship.query.filter_by(user_id=me, status="pending")
+        .order_by(Friendship.created_at.desc())
+        .all()
+    )
+
+    # Anyone I have a row with in either direction (pending or accepted) is
+    # already listed above, so leave them out of the "add" list.
+    rows = Friendship.query.filter(
+        or_(Friendship.user_id == me, Friendship.friend_id == me)
+    ).all()
+    connected = {r.friend_id if r.user_id == me else r.user_id for r in rows}
+    others = (
+        User.query.filter(User.id != me, User.id.notin_(connected))
+        .order_by(User.display_name)
+        .all()
+    )
+
+    return render_template(
+        "friends.html",
+        incoming=incoming,
+        outgoing=outgoing,
+        friends=get_friends(me),
+        others=others,
+    )
+
+
+@main.route("/friends/request/<int:user_id>", methods=["POST"])
+@login_required
+def friend_request(user_id):
+    me = session["user_id"]
+    target = db.session.get(User, user_id)
+    if target is None:
+        abort(404)
+    if target.id == me:
+        flash("You can't send a friend request to yourself.", "error")
+        return redirect(url_for("main.friends"))
+
+    rel = get_relationship(me, target.id)
+    if rel is None:
+        db.session.add(Friendship(user_id=me, friend_id=target.id, status="pending"))
+        db.session.commit()
+        flash(f"Friend request sent to {target.display_name}.", "success")
+    elif rel.status == "accepted":
+        flash(f"You're already friends with {target.display_name}.", "error")
+    elif rel.user_id == me:
+        flash(f"You've already sent {target.display_name} a request.", "error")
+    else:
+        # They already asked us, so treat this as accepting their request.
+        rel.status = "accepted"
+        db.session.commit()
+        flash(f"You're now friends with {target.display_name}.", "success")
+    return redirect(url_for("main.friends"))
+
+
+def _incoming_request_or_404(request_id):
+    row = db.session.get(Friendship, request_id)
+    if row is None or row.status != "pending" or row.friend_id != session["user_id"]:
+        abort(404)
+    return row
+
+
+@main.route("/friends/accept/<int:request_id>", methods=["POST"])
+@login_required
+def friend_accept(request_id):
+    row = _incoming_request_or_404(request_id)
+    row.status = "accepted"
+    db.session.commit()
+    flash(f"You're now friends with {row.sender.display_name}.", "success")
+    return redirect(url_for("main.friends"))
+
+
+@main.route("/friends/decline/<int:request_id>", methods=["POST"])
+@login_required
+def friend_decline(request_id):
+    row = _incoming_request_or_404(request_id)
+    name = row.sender.display_name
+    db.session.delete(row)
+    db.session.commit()
+    flash(f"Declined the request from {name}.", "success")
+    return redirect(url_for("main.friends"))
+
+
+@main.route("/friends/cancel/<int:request_id>", methods=["POST"])
+@login_required
+def friend_cancel(request_id):
+    row = db.session.get(Friendship, request_id)
+    if row is None or row.status != "pending" or row.user_id != session["user_id"]:
+        abort(404)
+    name = row.recipient.display_name
+    db.session.delete(row)
+    db.session.commit()
+    flash(f"Cancelled your request to {name}.", "success")
+    return redirect(url_for("main.friends"))
+
+
+@main.route("/friends/remove/<int:user_id>", methods=["POST"])
+@login_required
+def friend_remove(user_id):
+    row = get_friendship(session["user_id"], user_id)
+    if row is None:
+        abort(404)
+    other = row.recipient if row.user_id == session["user_id"] else row.sender
+    name = other.display_name
+    db.session.delete(row)
+    db.session.commit()
+    flash(f"Removed {name} from your friends.", "success")
+    return redirect(url_for("main.friends"))

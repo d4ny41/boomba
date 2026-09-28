@@ -54,3 +54,6 @@ class Friendship(db.Model):
     friend_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     status = db.Column(db.String(16), nullable=False)  # 'pending' / 'accepted'
     created_at = db.Column(db.DateTime, server_default=func.now(), default=func.now())
+
+    sender = db.relationship("User", foreign_keys=[user_id])
+    recipient = db.relationship("User", foreign_keys=[friend_id])

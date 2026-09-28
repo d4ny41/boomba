@@ -12,6 +12,7 @@
     {% if session.user_id %}
       <a href="{{ url_for('main.feed') }}">Feed</a>
       <a href="{{ url_for('main.rate') }}">Rate</a>
+      <a href="{{ url_for('main.friends') }}">Friends{% if incoming_request_count %} <span class="badge">{{ incoming_request_count }}</span>{% endif %}</a>
       <span class="spacer"></span>
       <span class="user">{{ session.display_name }}</span>
       <a href="{{ url_for('main.logout') }}">Logout</a>
