@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}{{ friend.display_name }}'s ratings · boomba{% endblock %}
+
+{% block content %}
+  <p><a href="{{ url_for('main.friends') }}">&larr; Friends</a></p>
+  <h1>{{ friend.display_name }}'s ratings</h1>
+
+  {% if not rows %}
+    <p class="muted">{{ friend.display_name }} hasn't rated anything yet.</p>
+  {% endif %}
+
+  <ul class="tracks">
+    {% for rating, t in rows %}
+      <li class="track" id="track-{{ t.id }}">
+        {% if t.album_art_url %}
+          <img class="art" src="{{ t.album_art_url }}" alt="{{ t.album_name or t.name }} cover" width="64" height="64">
+        {% else %}
+          <div class="art art-missing"></div>
+        {% endif %}
+
+        <div class="meta">
+          <div class="name">{{ t.name }}</div>
+          <div class="artist">{{ t.artist_name }}</div>
+        </div>
+
+        <div class="scores">
+          <div class="their-score">Their rating: {{ rating.score }}/5</div>
+          <div class="my-score muted">
+            Your rating: {% if t.id in my_scores %}{{ my_scores[t.id] }}/5{% else %}&mdash;{% endif %}
+          </div>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% endblock %}

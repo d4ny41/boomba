@@ -10,9 +10,12 @@ from app.models import db
 csrf = CSRFProtect()
 
 
-def create_app():
+def create_app(config_overrides=None):
     app = Flask(__name__, template_folder="../templates", static_folder="../static")
     app.config.from_object(Config)
+    # Applied before db.init_app so tests can swap in their own database URI.
+    if config_overrides:
+        app.config.update(config_overrides)
     app.logger.setLevel(logging.INFO)
 
     db.init_app(app)

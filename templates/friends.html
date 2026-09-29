@@ -63,7 +63,7 @@
         {{ avatar(u) }}
         <span class="name">{{ u.display_name }}</span>
         <div class="actions">
-          <span class="muted" title="Coming soon">View ratings</span>
+          <a href="{{ url_for('main.friend_ratings', user_id=u.id) }}">View ratings</a>
           {{ post_button('main.friend_remove', 'Unfriend', secondary=true, user_id=u.id) }}
         </div>
       </li>

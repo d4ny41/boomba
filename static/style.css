@@ -234,3 +234,13 @@ button.secondary {
 button.secondary:hover {
   background: #d0d0d4;
 }
+
+.scores {
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 0.9rem;
+}
+
+.their-score {
+  font-weight: 600;
+}

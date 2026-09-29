@@ -20,6 +20,7 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 from app.auth import login_required
 from app.models import Friendship, Rating, Track, User, db
 from app.services import (
+    are_friends,
     count_incoming_requests,
     get_friends,
     get_friendship,
@@ -323,3 +324,35 @@ def friend_remove(user_id):
     db.session.commit()
     flash(f"Removed {name} from your friends.", "success")
     return redirect(url_for("main.friends"))
+
+
+@main.route("/friends/<int:user_id>/ratings")
+@login_required
+def friend_ratings(user_id):
+    if user_id == g.user.id:
+        return redirect(url_for("main.rate"))
+    # 404 rather than 403 so this doesn't reveal whether the user exists.
+    if not are_friends(g.user.id, user_id):
+        abort(404)
+    friend = db.session.get(User, user_id)
+
+    # Reads only our database; no Spotify calls on this page.
+    rows = (
+        db.session.query(Rating, Track)
+        .join(Track, Rating.track_id == Track.id)
+        .filter(Rating.user_id == friend.id)
+        .order_by(Rating.score.desc(), Rating.rated_at.desc())
+        .all()
+    )
+
+    my_scores = {}
+    if rows:
+        mine = Rating.query.filter(
+            Rating.user_id == g.user.id,
+            Rating.track_id.in_([t.id for _, t in rows]),
+        ).all()
+        my_scores = {r.track_id: r.score for r in mine}
+
+    return render_template(
+        "friend_ratings.html", friend=friend, rows=rows, my_scores=my_scores
+    )
