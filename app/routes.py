@@ -47,7 +47,7 @@ def inject_incoming_request_count():
 def index():
     if session.get("user_id"):
         return redirect(url_for("main.feed"))
-    return render_template("index.html")
+    return render_template("landing.html")
 
 
 @main.route("/login")

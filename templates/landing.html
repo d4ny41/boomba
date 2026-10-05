@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>boomba</h1>
+  <p>
+    Boomba pulls the tracks you've been listening to on Spotify, lets you rate
+    them from 1 to 5, and shows how your scores compare with your friends'.
+  </p>
+  <p class="muted">
+    The app runs in Spotify's Development Mode, so logging in only works for a
+    small set of allowlisted test accounts. If you're not on the list, the demo
+    video and source code show how it works.
+  </p>
+  <p>
+    {# TODO: replace both placeholder links before publishing. #}
+    <a href="#">Watch the demo video</a> &middot;
+    <a href="https://github.com/your-username/boomba">View the code on GitHub</a>
+  </p>
+  <p><a class="button" href="{{ url_for('main.login') }}">Log in with Spotify</a></p>
+{% endblock %}
