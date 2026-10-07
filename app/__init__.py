@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from flask import Flask, flash, redirect, request, url_for
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
-from app.config import Config
+from app.config import DEMO_VIDEO_URL, GITHUB_REPO_URL, Config
 from app.models import db
 
 csrf = CSRFProtect()
@@ -21,6 +21,10 @@ def create_app(config_overrides=None):
     db.init_app(app)
     # Signs tokens with SECRET_KEY, which Config loads from FLASK_SECRET_KEY.
     csrf.init_app(app)
+
+    @app.context_processor
+    def inject_project_links():
+        return {"GITHUB_REPO_URL": GITHUB_REPO_URL, "DEMO_VIDEO_URL": DEMO_VIDEO_URL}
 
     @app.errorhandler(CSRFError)
     def handle_csrf_error(e):

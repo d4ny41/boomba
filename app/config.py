@@ -35,6 +35,10 @@ MYSQL_SSL_CA = os.getenv("MYSQL_SSL_CA")
 if MYSQL_SSL_CA and not os.path.isfile(MYSQL_SSL_CA):
     raise RuntimeError(f"MYSQL_SSL_CA points to a missing file: {MYSQL_SSL_CA}")
 
+# Public links shown on the landing page; exposed to templates in create_app.
+GITHUB_REPO_URL = "https://github.com/d4ny41/boomba"
+DEMO_VIDEO_URL = "https://github.com/d4ny41/boomba#demo"
+
 
 class Config:
     SPOTIFY_CLIENT_ID = os.environ["SPOTIFY_CLIENT_ID"]

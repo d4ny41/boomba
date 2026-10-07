@@ -12,9 +12,8 @@
     video and source code show how it works.
   </p>
   <p>
-    {# TODO: replace both placeholder links before publishing. #}
-    <a href="#">Watch the demo video</a> &middot;
-    <a href="https://github.com/your-username/boomba">View the code on GitHub</a>
+    <a href="{{ DEMO_VIDEO_URL }}" target="_blank" rel="noopener noreferrer">Watch the demo video</a> &middot;
+    <a href="{{ GITHUB_REPO_URL }}" target="_blank" rel="noopener noreferrer">View the code on GitHub</a>
   </p>
   <p><a class="button" href="{{ url_for('main.login') }}">Log in with Spotify</a></p>
 {% endblock %}

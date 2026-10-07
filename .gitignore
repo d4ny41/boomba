@@ -3,3 +3,11 @@ venv/
 __pycache__/
 .cache
 .env.production
+.DS_Store
+CLAUDE.md
+docs/
+scripts/
+.claude/
+.pytest_cache/
+.vscode/
+*.pyc
