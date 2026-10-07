@@ -25,9 +25,6 @@ def carol(make_user):
     return make_user("Carol")
 
 
-# --- friend requests ---------------------------------------------------------
-
-
 def test_request_to_self_is_rejected(client, login_as, alice):
     login_as(alice)
     resp = client.post(f"/friends/request/{alice.id}", follow_redirects=True)
@@ -84,9 +81,6 @@ def test_recipient_can_respond(client, login_as, alice, bob, action, expected):
 
     row = Friendship.query.first()
     assert (row.status if row else None) == expected
-
-
-# --- friend ratings page -----------------------------------------------------
 
 
 @pytest.fixture(autouse=True)

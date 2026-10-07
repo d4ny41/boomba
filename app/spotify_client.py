@@ -14,9 +14,7 @@ class SpotifyAuthError(Exception):
 
 
 def get_oauth():
-    # MemoryCacheHandler() is required: cache_handler=None makes spotipy fall back
-    # to its default file cache, which is shared on disk and would cross sessions
-    # between users. See CLAUDE.md.
+    # Not cache_handler=None: that falls back to spotipy's on-disk cache, shared across users.
     return SpotifyOAuth(
         client_id=current_app.config["SPOTIFY_CLIENT_ID"],
         client_secret=current_app.config["SPOTIFY_CLIENT_SECRET"],
@@ -28,11 +26,7 @@ def get_oauth():
 
 
 def get_spotify_for_user(user):
-    """Return a Spotify client for `user`, refreshing their access token.
-
-    Raises SpotifyAuthError if Spotify rejects the stored refresh token
-    (e.g. the user revoked access); callers should redirect to /login.
-    """
+    """Raises SpotifyAuthError if the stored refresh token is rejected; send the user to /login."""
     try:
         token_info = get_oauth().refresh_access_token(user.spotify_refresh_token)
     except SpotifyOauthError as e:
@@ -40,7 +34,7 @@ def get_spotify_for_user(user):
             f"Spotify refresh failed for user {user.id}: {e.error or e}"
         ) from e
 
-    # Spotify may rotate the refresh token; persist the new one if so.
+    # Spotify can rotate the refresh token, after which the old one stops working.
     new_refresh_token = token_info.get("refresh_token")
     if new_refresh_token and new_refresh_token != user.spotify_refresh_token:
         user.spotify_refresh_token = new_refresh_token

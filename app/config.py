@@ -3,9 +3,7 @@ from urllib.parse import quote_plus
 
 from dotenv import load_dotenv
 
-# init_db.py sets BOOMBA_ENV_FILE to point at e.g. .env.production; otherwise
-# python-dotenv finds the project's .env as before. Real environment variables
-# (as on Render) always win over the file.
+# init_db.py can point BOOMBA_ENV_FILE at another file; real env vars still take precedence.
 load_dotenv(os.getenv("BOOMBA_ENV_FILE"))
 
 _REQUIRED = (
@@ -35,7 +33,6 @@ MYSQL_SSL_CA = os.getenv("MYSQL_SSL_CA")
 if MYSQL_SSL_CA and not os.path.isfile(MYSQL_SSL_CA):
     raise RuntimeError(f"MYSQL_SSL_CA points to a missing file: {MYSQL_SSL_CA}")
 
-# Public links shown on the landing page; exposed to templates in create_app.
 GITHUB_REPO_URL = "https://github.com/d4ny41/boomba"
 DEMO_VIDEO_URL = "https://github.com/d4ny41/boomba#demo"
 
@@ -45,13 +42,12 @@ class Config:
     SPOTIFY_CLIENT_SECRET = os.environ["SPOTIFY_CLIENT_SECRET"]
     SPOTIFY_REDIRECT_URI = os.environ["SPOTIFY_REDIRECT_URI"]
     SECRET_KEY = os.environ["FLASK_SECRET_KEY"]
-    # Defence in depth alongside CSRFProtect: Lax keeps the session cookie off
-    # cross-site POSTs, HttpOnly keeps it out of reach of page JS.
+    # Defence in depth alongside CSRFProtect.
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_HTTPONLY = True
 
     if IS_PRODUCTION:
-        # Production is served over HTTPS only; never send the cookie in clear.
+        # Local dev runs over plain HTTP, where a Secure cookie would never be sent.
         SESSION_COOKIE_SECURE = True
         DEBUG = False
 
@@ -63,8 +59,7 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
-        # Hosted MySQL drops idle connections; test each one before use and
-        # recycle them before the server-side timeout kicks in.
+        # Hosted MySQL drops idle connections, so ping before use and recycle before its timeout.
         "pool_pre_ping": True,
         "pool_recycle": 280,
     }

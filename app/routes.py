@@ -32,7 +32,7 @@ from app.spotify_client import SpotifyAuthError, get_oauth, get_spotify_for_user
 main = Blueprint("main", __name__)
 
 
-# The only places a POST /rate may send the user back to; never a URL from the form.
+# Fixed redirect targets so the form's "next" value can't become an open redirect.
 NEXT_ENDPOINTS = {"rate": "main.rate", "feed": "main.feed"}
 VALID_SCORES = {"1", "2", "3", "4", "5"}
 
@@ -124,8 +124,7 @@ def feed():
         flash("Your Spotify session has expired. Please log in again.", "error")
         return redirect(url_for("main.login"))
 
-    # Top-tracks items are track objects directly (no {"track": ...} wrapper),
-    # already in rank order.
+    # Unlike recently played, top-tracks items are bare track objects, already in rank order.
     items = sp.current_user_top_tracks(limit=20, time_range="short_term")["items"]
     tracks = get_or_create_tracks(items)
 
@@ -153,7 +152,7 @@ def rate():
 
     items = sp.current_user_recently_played(limit=50)["items"]
 
-    # Items come newest first, so the first time we see a track id is its most recent play.
+    # Recently played repeats tracks; items are newest first, so keep each track's first occurrence.
     seen = set()
     raw_tracks = []
     for item in items:
@@ -193,8 +192,7 @@ def rate_submit():
         return redirect(url_for(endpoint))
     score = int(raw_score)
 
-    # Single-statement upsert on uq_ratings_user_track. rated_at is set explicitly
-    # because the model's onupdate doesn't fire for ON DUPLICATE KEY UPDATE.
+    # rated_at is set explicitly because onupdate doesn't fire for ON DUPLICATE KEY UPDATE.
     stmt = mysql_insert(Rating).values(
         user_id=user_id, track_id=track.id, score=score, rated_at=func.now()
     )
@@ -222,8 +220,7 @@ def friends():
         .all()
     )
 
-    # Anyone I have a row with in either direction (pending or accepted) is
-    # already listed above, so leave them out of the "add" list.
+    # Pending and accepted connections are already listed above.
     rows = Friendship.query.filter(
         or_(Friendship.user_id == me, Friendship.friend_id == me)
     ).all()
@@ -336,7 +333,7 @@ def friend_ratings(user_id):
         abort(404)
     friend = db.session.get(User, user_id)
 
-    # Reads only our database; no Spotify calls on this page.
+    # No Spotify calls here; this page reads only our database.
     rows = (
         db.session.query(Rating, Track)
         .join(Track, Rating.track_id == Track.id)

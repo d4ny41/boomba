@@ -13,8 +13,7 @@ def app():
         {
             "TESTING": True,
             "WTF_CSRF_ENABLED": False,
-            # In-memory SQLite; Flask-SQLAlchemy keeps one shared connection for it,
-            # so each app (and so each test) gets its own fresh database.
+            # Flask-SQLAlchemy shares one connection for in-memory SQLite, so each test gets a fresh DB.
             "SQLALCHEMY_DATABASE_URI": "sqlite://",
         }
     )

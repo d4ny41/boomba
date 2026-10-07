@@ -26,11 +26,7 @@ def _track_from_dict(track_dict):
 
 
 def get_or_create_tracks(track_dicts):
-    """Return Track rows for raw Spotify track objects, inserting missing ones.
-
-    Commits once for the whole batch. Tracks without an id (local files) are
-    skipped; repeated ids are returned once, in first-seen order.
-    """
+    """Skips tracks without an id (local files); repeated ids are returned once, in order."""
     unique = {}
     for track_dict in track_dicts:
         if track_dict and track_dict.get("id"):
@@ -54,13 +50,11 @@ def get_or_create_tracks(track_dicts):
 
 
 def get_or_create_track(track_dict):
-    """Return the Track row for one raw Spotify track object, inserting if needed."""
     tracks = get_or_create_tracks([track_dict])
     return tracks[0] if tracks else None
 
 
 def _between(user_a_id, user_b_id):
-    """Filter clause matching a Friendship row between two users, either direction."""
     return or_(
         and_(Friendship.user_id == user_a_id, Friendship.friend_id == user_b_id),
         and_(Friendship.user_id == user_b_id, Friendship.friend_id == user_a_id),
@@ -68,12 +62,11 @@ def _between(user_a_id, user_b_id):
 
 
 def get_relationship(user_a_id, user_b_id):
-    """Return the Friendship row between two users (any status, either direction), or None."""
+    """Like get_friendship, but any status."""
     return Friendship.query.filter(_between(user_a_id, user_b_id)).first()
 
 
 def get_friendship(user_a_id, user_b_id):
-    """Return the accepted Friendship row between two users, or None."""
     return Friendship.query.filter(
         _between(user_a_id, user_b_id), Friendship.status == "accepted"
     ).first()
@@ -84,7 +77,6 @@ def are_friends(user_a_id, user_b_id):
 
 
 def get_friends(user_id):
-    """Return the User rows this user has an accepted friendship with, by name."""
     rows = Friendship.query.filter(
         or_(Friendship.user_id == user_id, Friendship.friend_id == user_id),
         Friendship.status == "accepted",
