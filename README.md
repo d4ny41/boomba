@@ -1,132 +1,78 @@
-# Boomba
-
-Boomba is a Flask web app where you sign in with Spotify, rate the tracks you've been listening to on a 1 to 5 scale, and see how your friends rated theirs. I built it as a solo project to practise OAuth, relational schema design and web security against a real third-party API with real platform constraints.
-
-## Demo
-
+**Boomba**
+Boomba is an attempt at building a Letterboxd-style music rating platform. Users can authenticate with their Spotify accounts to rate their most recently played tracks and the songs they have been listening to most over the last four weeks. They can also add other Boomba users as friends to view and compare each other's ratings. This version of the app was made as a solo project to practise OAuth, relational schema design, and web security against a real third-party API with real platform constraints.
+**Demo**
 Demo video coming soon.
-
-Live: RENDER_URL_HERE. Sign-in only works for Spotify accounts on the app's allowlist (see [Known limitations](#known-limitations)), and the free host may take a moment to wake up.
-
-## Features
-
-- Sign in with Spotify. There are no passwords.
-- Feed: your 20 top tracks from the last four weeks, with album art, rated inline.
-- Rate page: your 50 most recent plays, deduplicated, each with a 1 to 5 rating. Re-rating a track updates your existing score.
-- Friends: send, accept, decline and cancel friend requests, and remove friends. The people you can add are other Boomba users, not Spotify's user directory.
-- Friend ratings: view an accepted friend's rated tracks, highest score first, next to your own score for the same track.
-
-## Tech stack
-
-- Python 3, Flask 3, Jinja2 templates
-- spotipy for the Spotify Web API
-- MySQL 8 via Flask-SQLAlchemy / SQLAlchemy 2 and the PyMySQL driver
-- Flask-WTF for CSRF protection
-- gunicorn for production
-- pytest
-- Docker for local MySQL
-
-## How it works
-
-**Authentication.** `/login` redirects to Spotify's authorisation page with a random `state` value stored in the session, and `/callback` checks that value before exchanging the code for tokens. The app then calls `GET /me`, creates or updates the matching row in `users`, and stores that user's Spotify refresh token on the row. On each request that needs Spotify data, the stored refresh token is exchanged for a fresh access token; if Spotify rotates the refresh token, the new one is saved. If the refresh token has been revoked, the session is cleared and the user is sent back to log in.
-
-spotipy's `SpotifyOAuth` writes tokens to a `.cache` file on disk by default, and passing `cache_handler=None` still falls back to that file. A single file shared by every user of the server would let one user's token be picked up by another user's request. `app/spotify_client.py` passes `MemoryCacheHandler()` explicitly, so spotipy never touches disk, and the database is the only place tokens persist.
-
-**Track caching.** Track metadata from Spotify (name, artists, album, album art) is stored in a `tracks` table keyed on the Spotify track ID. Each page load looks up all the tracks it received in one query and inserts only the missing ones in a single commit. The friend ratings page reads only from the database and makes no Spotify calls.
-
-**Schema.** Four tables:
-
-| Table | Purpose | Constraints |
-|---|---|---|
-| `users` | One row per Spotify account, with its refresh token | `spotify_id` unique |
-| `tracks` | Cached Spotify track metadata | `spotify_track_id` unique |
-| `ratings` | A user's 1 to 5 score for a track | Unique on (`user_id`, `track_id`); check `score BETWEEN 1 AND 5` |
-| `friendships` | A friend request from `user_id` to `friend_id`, with status `pending` or `accepted` | Foreign keys to `users` |
-
-The unique constraint on `ratings` lets a rating be saved with a single `INSERT ... ON DUPLICATE KEY UPDATE` statement, so a user has at most one score per track.
-
-## Security
-
-- **CSRF.** Rating and all friend actions are POST routes protected by Flask-WTF's `CSRFProtect`, and every form includes a CSRF token. A failed check redirects back to the referring page only if it is on the same host, to avoid an open redirect.
-- **Session cookies.** `SameSite=Lax` and `HttpOnly` are always set. When `APP_ENV=production`, `Secure` is also set and debug mode is forced off.
-- **Rating validation.** The server accepts only the strings `"1"` to `"5"` as a score and only an existing track ID; anything else is rejected without writing. The page to return to after rating comes from a fixed allowlist, not from a URL in the form. The database check constraint on `score` is a second line of defence.
-- **Friendship authorisation (IDOR).** `/friends/<user_id>/ratings` checks for an accepted friendship between the logged-in user and `user_id` before loading anything, and returns 404, not 403, to non-friends so the response doesn't reveal whether that user exists. Accept, decline, cancel and remove apply the same pattern: a request ID or user ID that doesn't belong to the current user returns 404.
-- **OAuth state.** The `state` parameter is checked on callback to block login CSRF.
-
-## Running locally
-
-### Prerequisites
-
-- Python 3 (developed on 3.13)
-- Docker
-- A Spotify account and a Spotify app of your own (below)
-
-### 1. Register a Spotify app
-
-1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create an app.
-2. Add the redirect URI `http://127.0.0.1:5000/callback` exactly. Use `127.0.0.1`, not `localhost`.
-3. Copy the client ID and client secret.
-4. Under User Management, add the Spotify account email of everyone who will log in, including yourself. Accounts that aren't listed get a 403 from Spotify.
-
-### 2. Start MySQL
-
-```
-docker run --name boomba-db \
-  -e MYSQL_ROOT_PASSWORD=your_root_password \
-  -e MYSQL_DATABASE=boomba \
-  -e MYSQL_USER=app_user \
-  -e MYSQL_PASSWORD=your_app_password \
-  -p 3306:3306 \
-  -d mysql:8
-```
-
-### 3. Configure environment
-
-```
-cp .env.example .env
-```
-
-Fill in the Spotify client ID, secret and redirect URI, a `FLASK_SECRET_KEY` (generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`), and the MySQL values matching the Docker command above. Leave `MYSQL_SSL_CA` empty for local Docker MySQL. The app refuses to start if any required variable is missing. Each variable is described in `.env.example`.
-
-### 4. Install dependencies and create the tables
-
-```
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python init_db.py
-```
-
-`init_db.py` creates the four tables. It takes `--env-file` to target a different database, for example `python init_db.py --env-file .env.production`.
-
-### 5. Run
-
-```
-python run.py
-```
-
-Open http://127.0.0.1:5000. Set `FLASK_DEBUG=1` in `.env` to enable the debugger and reloader. In production, set `APP_ENV=production` and serve `run:app` with gunicorn.
-
-## Running tests
-
-```
+The app is live at https://boomba-rc2r.onrender.com. Spotify only allows apps in development mode to be used by five approved accounts, so you will not be able to log in unless I have added your account. The video above shows the full flow for that reason. The site is on a free hosting plan, so the first visit after a quiet period can take a little while to load.
+**Features**
+* Users sign in with their Spotify account. There is no separate username or password, so the app never stores a password.
+* The home feed shows a user's top 20 tracks from the last four weeks with album art, and each one can be rated from 1 to 5 without leaving the page.
+* The rating page pulls a user's 50 most recently played tracks and removes any repeats. Rating a song again updates the existing score rather than creating a second entry.
+* Users can send, accept, decline, and cancel friend requests with other Boomba users, and remove friends.
+* Each friend has a page listing their ratings from highest to lowest, with the user's own rating for the same song shown next to theirs.
+**Tech Stack**
+* Backend: Python 3, Flask, and Jinja2 templates
+* Spotify integration: spotipy
+* Database: MySQL 8 through Flask-SQLAlchemy and PyMySQL, hosted on Aiven in production and run in Docker for local development
+* Security and testing: Flask-WTF for CSRF protection and pytest for automated tests
+* Deployment: gunicorn on Render
+**How It Works**
+Signing in with Spotify
+Login uses Spotify's OAuth 2.0 authorisation code flow through the /login and /callback routes. By default, spotipy saves tokens to a .cache file on disk. On a server used by several people, this could lead to one user being handed another user's token. I noticed this during testing when a .cache file appeared in the project folder after logging in, so the app now uses spotipy's MemoryCacheHandler, which keeps tokens in memory only.
+Each user's refresh token is stored on their row in the users table. Whenever a page needs Spotify data, the app uses that refresh token to get a new access token for that request. If Spotify issues a new refresh token in the process, the app saves it in place of the old one. If a user removes Boomba's access from their Spotify settings, they are logged out and sent back to the login page.
+*Caching tracks*
+Every track a user sees is saved in the tracks table the first time it appears, along with its name, artists, album, and album art. Ratings point to these rows rather than to Spotify directly. This means two users who rate the same song are rating the same row, which is what allows ratings to be compared between friends. New tracks are added together with a single commit, and the friend ratings page reads only from the database without making any calls to Spotify.
+**Database**
+The database has four tables: users, tracks, ratings, and friendships. The ratings table has a unique constraint on the combination of user_id and track_id, so a user can only have one rating per song. When a user rates a song they have already rated, the existing row is updated, and the constraint stops a duplicate from being saved even if that logic ever failed. A check constraint also keeps every score between 1 and 5.
+Each row in friendships is a request from one user to another, marked as either pending or accepted. Since either person could have sent the original request, the app checks both directions whenever it needs to know whether two users are friends.
+**Security**
+Since practising web security was one of the main goals of this project, I added the following protections.
+* Every form that changes data, such as rating a song or accepting a friend request, sends a POST request protected by a Flask-WTF CSRF token. This stops another website from submitting forms on behalf of a logged-in user.
+* The session cookie is signed, marked HttpOnly and SameSite=Lax, and marked Secure when the app runs in production.
+* The logged-in user is always taken from the session and never from a form field, so nobody can rate songs or send requests as someone else.
+* The server rejects any score that is not a whole number from 1 to 5, as well as ratings for tracks that do not exist. The database check constraint acts as a second line of defence.
+* After a rating is submitted, the app only redirects to one of two known pages, which prevents open redirect attacks.
+* Only the recipient of a friend request can accept or decline it, and only the sender can cancel it.
+* The app checks for an accepted friendship before showing another user's ratings. Anyone who is not a friend gets a 404 Not Found rather than a 403 Forbidden, so the response does not reveal whether that user exists.
+* All secrets are kept in environment variables and never committed to the repository. The production database connection is encrypted with SSL, and debug mode is turned off in production.
+Some protection also comes from the tools themselves. SQLAlchemy uses parameterised queries, which guards against SQL injection, and Jinja2 escapes values like display names before adding them to a page, which guards against cross-site scripting.
+*How It Was Built*
+I planned the features, the database design, and the security requirements myself. I used Claude Code to write much of the implementation. I reviewed the changes at each stage and tested every step by hand, which is how I caught the token cache problem described above.
+**Running Locally**
+You will need Python 3, Docker, and a Spotify account. The account that owns the Spotify app needs an active Premium subscription.
+1. Clone the repository and install the dependencies.git clone https://github.com/d4ny41/boomba.git
+2. cd boomba
+3. python3 -m venv venv
+4. source venv/bin/activate
+5. pip install -r requirements.txt
+6. 
+7. Create an app on the Spotify Developer Dashboard. Set the redirect URI to http://127.0.0.1:5000/callback and add your Spotify account under User Management.
+8. Start a MySQL container.docker run --name song-ratings-db \
+9.   -e MYSQL_ROOT_PASSWORD=choose_a_root_password \
+10.   -e MYSQL_DATABASE=song_ratings \
+11.   -e MYSQL_USER=app_user \
+12.   -e MYSQL_PASSWORD=choose_a_password \
+13.   -p 3306:3306 \
+14.   -d mysql:8
+15. 
+16. Copy .env.example to .env and fill in your Spotify credentials, a Flask secret key, and the MySQL details from the previous step.cp .env.example .env
+17. 
+18. Create the tables and start the app.python init_db.py
+19. python run.py
+20. 
+21. Open http://127.0.0.1:5000 in your browser. Use 127.0.0.1 rather than localhost, since the address has to match the redirect URI registered with Spotify.
+Running Tests
 pytest
-```
-
-The tests run against an isolated in-memory SQLite database created fresh for each test, so MySQL doesn't need to be running and no Spotify calls are made. A populated `.env` is still required, because the config checks for every required variable on import. There are currently 18 tests, covering the landing page, the friend request flow, and friend ratings authorisation.
-
-## Known limitations
-
-- **Spotify Development Mode.** This is a Spotify platform constraint, not a bug. Apps in Development Mode are limited to 5 allowlisted users, the app owner's account needs Spotify Premium, and many endpoints are restricted, including reading Spotify-curated playlists such as the global charts. Lifting these limits (Extended Quota Mode) requires an established business with a large existing user base, which isn't reachable for a project like this. The app is designed around it: the feed uses each user's own top tracks instead of a global chart, and friends are found from Boomba's own `users` table instead of Spotify's user directory.
-- **Token refresh on every request.** Access tokens are not stored; each request that calls Spotify refreshes one from the stored refresh token. This is a deliberate simplification that costs one extra Spotify call per page load.
-- **Cold starts.** The live demo runs on a free hosting tier that sleeps when idle, so the first request after a quiet period is slow.
-
-## Roadmap
-
-- Track search, so you can rate tracks outside your recent plays and top tracks
-- A combined feed of ratings across your friend group
-- Written reviews and comments on ratings
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+The 18 tests run against a temporary in-memory SQLite database, so they never touch the MySQL data. They cover the friend request rules, who is allowed to see whose ratings, and the links on the landing page.
+**Known Limitations**
+* Spotify's development mode limits the app to five approved accounts and requires the owner to have Premium. Opening it to the public would need extended access, which Spotify only grants to registered businesses with at least 250,000 monthly active users.
+* Spotify no longer lets apps in development mode read its own charts and playlists or look up other users. This is why the feed shows each user's own top tracks rather than a global chart, and why friends are found among Boomba users rather than on Spotify.
+* A new access token is requested on every page load. This keeps the code simple but adds an extra request to Spotify each time.
+* Refresh tokens are stored in the database without encryption, there is no rate limiting, and logging out uses a link rather than a protected form.
+**What I'd Do Next**
+* Add search so users can rate any song, not only ones they have played recently
+* Add a feed showing the most popular tracks across a user's group of friends
+* Let users write short reviews alongside their ratings
+* Encrypt refresh tokens, add rate limiting, and move to proper database migrations with Flask-Migrate
+* Add a messaging option between friends, where they can chat and share songs from Spotify among each other
+License
+This project is licensed under the MIT License. See LICENSE for details.
