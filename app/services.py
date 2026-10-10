@@ -49,11 +49,6 @@ def get_or_create_tracks(track_dicts):
     return [existing[sid] for sid in unique]
 
 
-def get_or_create_track(track_dict):
-    tracks = get_or_create_tracks([track_dict])
-    return tracks[0] if tracks else None
-
-
 def _between(user_a_id, user_b_id):
     return or_(
         and_(Friendship.user_id == user_a_id, Friendship.friend_id == user_b_id),

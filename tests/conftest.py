@@ -24,6 +24,17 @@ def app():
         db.drop_all()
 
 
+@pytest.fixture(autouse=True)
+def no_spotify(monkeypatch):
+    """Fail loudly if any view under test tries to reach Spotify."""
+
+    def boom(*args, **kwargs):
+        raise AssertionError("Spotify API must not be called")
+
+    monkeypatch.setattr("app.routes.get_spotify_for_user", boom)
+    monkeypatch.setattr("app.routes.get_oauth", boom)
+
+
 @pytest.fixture
 def client(app):
     return app.test_client()

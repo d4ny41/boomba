@@ -111,7 +111,7 @@ You will need Python 3, Docker, and a Spotify account. The account that owns the
 pytest
 ```
 
-The 18 tests run against a temporary in-memory SQLite database, so they never touch the MySQL data. They cover the friend request rules, who is allowed to see whose ratings, and the links on the landing page.
+The 27 tests run against a temporary in-memory SQLite database, so they never touch the MySQL data. They cover the friend request rules, who is allowed to see whose ratings, and the links on the landing page.
 
 ## Known Limitations
 

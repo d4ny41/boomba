@@ -83,17 +83,6 @@ def test_recipient_can_respond(client, login_as, alice, bob, action, expected):
     assert (row.status if row else None) == expected
 
 
-@pytest.fixture(autouse=True)
-def no_spotify(monkeypatch):
-    """Fail loudly if any view under test tries to reach Spotify."""
-
-    def boom(*args, **kwargs):
-        raise AssertionError("Spotify API must not be called")
-
-    monkeypatch.setattr("app.routes.get_spotify_for_user", boom)
-    monkeypatch.setattr("app.routes.get_oauth", boom)
-
-
 def test_ratings_page_404_for_non_friend(client, login_as, alice, bob, make_rating):
     make_rating(bob, "Secret Song", 5)
     login_as(alice)

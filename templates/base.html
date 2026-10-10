@@ -15,7 +15,10 @@
       <a href="{{ url_for('main.friends') }}">Friends{% if incoming_request_count %} <span class="badge">{{ incoming_request_count }}</span>{% endif %}</a>
       <span class="spacer"></span>
       <span class="user">{{ session.display_name }}</span>
-      <a href="{{ url_for('main.logout') }}">Logout</a>
+      <form class="nav-form" method="post" action="{{ url_for('main.logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link-button">Logout</button>
+      </form>
     {% else %}
       <span class="spacer"></span>
       <a href="{{ url_for('main.login') }}">Log in with Spotify</a>

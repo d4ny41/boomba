@@ -5,12 +5,12 @@
 {% block content %}
   <h1>Rate your recent tracks</h1>
 
-  {% if not tracks %}
+  {% if tracks is not none and not tracks %}
     <p class="muted">No recently played tracks found. Play something on Spotify and come back.</p>
   {% endif %}
 
   <ul class="tracks">
-    {% for t in tracks %}
+    {% for t in tracks or [] %}
       <li class="track" id="track-{{ t.id }}">
         {% if t.album_art_url %}
           <img class="art" src="{{ t.album_art_url }}" alt="{{ t.album_name or t.name }} cover" width="64" height="64">

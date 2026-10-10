@@ -5,7 +5,9 @@
 {% block content %}
   <h1>Your top tracks this month</h1>
 
-  {% if not tracks %}
+  {% if tracks is none %}
+    {# Spotify call failed; the flash message explains. #}
+  {% elif not tracks %}
     <p class="muted">
       Spotify hasn't worked out your top tracks yet. Listen for a bit and check back,
       or <a href="{{ url_for('main.rate') }}">rate your recent plays</a> in the meantime.
