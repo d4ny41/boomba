@@ -4,7 +4,10 @@ Boomba is an attempt at building a Letterboxd-style music rating platform. Users
 
 ## Demo
 
-Demo video coming soon.
+
+
+https://github.com/user-attachments/assets/b388b3d6-7650-4bf4-8ab8-28ba7b4313b8
+
 
 The app is live at https://boomba-rc2r.onrender.com. Spotify only allows apps in development mode to be used by five approved accounts, so you will not be able to log in unless I have added your account. The video above shows the full flow for that reason. The site is on a free hosting plan, so the first visit after a quiet period can take a little while to load.
 
